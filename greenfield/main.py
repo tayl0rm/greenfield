@@ -1,34 +1,54 @@
-import discord, os, requests
-from dotenv import load_dotenv
+import discord
+import os
+import asyncio
+import python_terraform
 
-client = discord.Client(intents=discord.Intents.default())
+from discord.ext import commands
+from discord.ext.commands import Bot
+from discord.utils import get
+from dotenv import load_dotenv
+from discord import Intents
+
+# Enable all standard intents and message content
+# (prefix commands generally require message content)
+intents = Intents.default()
+intents.message_content = True
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
-RIOT_TOKEN = os.getenv('RIOT_TOKEN')
 
-def lol_status():
-  payload = {'api_key': RIOT_TOKEN}
-  lol_return_status = requests.get('https://euw1.api.riotgames.com/lol/status/v4/platform-data?', params=payload)
-  print(lol_return_status)
+intents = discord.Intents.all()
 
-def val_status():
-  payload = {'api_key': RIOT_TOKEN}
-  val_return_status = requests.get('https://eu.api.riotgames.com/val/status/v1/platform-data?', params=payload)
-  print(val_return_status)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Reference code
 
-@client.event
-async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+# @bot.command()
+# async def permit(ctx, user : discord.Member):
+#     def check(m):
+#         if m.author == ctx.author and m.channel == ctx.channel:
+#             try:
+#                 float(m.content)
+#                 return True
+#             except ValueError:
+#                 return False
+#         return False
+#     permitRole=ctx.guild.get_role(941361821816860732)#the id of particular role you want to give 
+#     await ctx.send("Tell me the hours")
+#     res = await bot.wait_for("message", check=check)
+#     bot.seconds = float(res.content) * 3600
+#     await user.add_roles(permitRole)#giving the role to mentioned user
+#     await ctx.send(f"Added role to {user.mention}")#tells the user that the role is given
+#     await ctx.send(f"The time is {bot.seconds} seconds")#tells the time period of the role to the user
+#     toime=float(res.content)#gets the message input as float variable
+#     toimefoinal=toime*3600 #converts to seconds
+#     await asyncio.sleep(toimefoinal)#sleeps the command 
+#     await ctx.send("TIME UP")#this is after the time period 
+#     await user.remove_roles(permitRole)#removes the role 
+#     await ctx.send("TY FOR CHOOSING THIS SERVER!")
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
+# bot.run(os.getenv('DISCORD_TOKEN'))#bot token
 
-    if message.content.startswith("val status"):
-        await message.channel.send("Hello")
-
-client.run(os.getenv('DISCORD_TOKEN'))
-
+# @bot.command()
+# def valheim_server_up():
+#     os.

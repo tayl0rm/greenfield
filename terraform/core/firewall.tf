@@ -8,4 +8,3 @@ resource "google_compute_firewall" "core_firewall" {
   source_tags   = ["troubleshooting"]
   source_ranges = ["35.235.240.0/20"] # Google IAP Service CIDR
 }
-
