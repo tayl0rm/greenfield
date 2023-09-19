@@ -1,6 +1,11 @@
 variable "core" {
   default     = "core"
-  description = "Generic name for resources dedicated to the Valheim server."
+  description = "Generic name for resources dedicated to the game servers."
+}
+
+variable "bot" {
+  default     = "discord-bot"
+  description = "Generic name for resources dedicated to the Discord bot."
 }
 
 variable "region" {
