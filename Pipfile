@@ -8,6 +8,8 @@ requests = "*"
 discord = "*"
 python-dotenv = "*"
 python-terraform = "*"
+google-api-core = "*"
+google-api-client = "*"
 
 [dev-packages]
 black = "*"
