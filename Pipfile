@@ -9,7 +9,7 @@ discord = "*"
 python-dotenv = "*"
 python-terraform = "*"
 google-api-core = "*"
-google-api-client = "*"
+google-api-python-client = "*"
 
 [dev-packages]
 black = "*"
