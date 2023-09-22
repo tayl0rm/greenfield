@@ -3,7 +3,8 @@ locals {
     "roles/compute.instanceAdmin.v1",
     "roles/storage.objectViewer",
     "roles/storage.objectCreator",
-    "roles/logging.logWriter"
+    "roles/logging.logWriter",
+    "roles/iam.serviceAccountTokenCreator"
   ]
 }
 

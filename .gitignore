@@ -4,6 +4,8 @@
 **/*-planfile
 **/terraform.tfstate.backup
 
+gcloud-service-account.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

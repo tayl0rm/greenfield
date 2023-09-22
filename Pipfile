@@ -10,6 +10,7 @@ python-dotenv = "*"
 python-terraform = "*"
 google-api-core = "*"
 google-api-python-client = "*"
+google-cloud-compute = "*"
 
 [dev-packages]
 black = "*"
