@@ -27,5 +27,5 @@ resource "google_compute_instance" "discord_bot_instance" {
     scopes = ["cloud-platform"]
   }
 
-  metadata_startup_script = "echo hi > /test.txt"
+  metadata_startup_script = "python3 discord_bot/bot.py"
 }

@@ -1,8 +1,10 @@
 #!/bin/bash
+
+cat <<EOF >>start_server_custom.sh
+#!/bin/bash
 # copy this script to: home\[user]\Steam\steamapps\common\Valheim dedicated server
 
 # doesn't work: basename $BASH_SOURCE
-source /workspaces/greenfield/.env
 script_name=start_server.sh
 
 function log {
@@ -58,7 +60,7 @@ trap "handle_interrupt" SIGINT SIGTERM
 # NOTE: Minimum password length is 5 characters & Password cant be in the server name.
 # NOTE: You need to make sure the ports 2456-2458 is being forwarded to your server through your local router & firewall.
 log "Starting server PRESS CTRL-C to exit"
-./valheim_server.x86_64 -name "$server_name" -port 2456 -world "$world_name" -password "$server_password" & serverpid=$!
+./valheim_server.x86_64 -name "ekco-valheim-core" -port 2456 -world "valheim-core" -password "v4lhe1m_c0R3" & serverpid=$!
 
 log "Server-PID is $serverpid"
 
@@ -79,3 +81,7 @@ log "Deleting $pidfile"
 rm $pidfile
 
 log "Done"
+EOF
+
+sudo cp start_server_custom.sh /
+chmod u+x Steam/steamapps/common/Valheim dedicated server/start_server_custom.sh

@@ -24,6 +24,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.command(name="valheim-up")
 async def valheim_up(ctx):
+    server_name = os.getenv('server_name')
+    server_password = os.getenv('server_password')
+
     await ctx.channel.send('The Valheim Server is spinning up!')
     service = discovery.build('compute', 'v1')
 
@@ -36,10 +39,11 @@ async def valheim_up(ctx):
 
     response = service.instances().get(
         project=project, zone=zone, instance=instance).execute()
+        
     vahleim_server_ip = response['networkInterfaces'][0]['accessConfigs'][0]['natIP']
 
     await asyncio.sleep(60)
-    await ctx.channel.send(f'The Valheim Server is accessible at {vahleim_server_ip}!')
+    await ctx.channel.send(f'The Valheim Server, {server_name}, is accessible at {vahleim_server_ip}! The password is {server_password}!')
 
 
 @bot.command(name="valheim-down")

@@ -27,5 +27,5 @@ resource "google_compute_instance" "valheim_core_instance" {
     scopes = ["cloud-platform"]
   }
 
-  metadata_startup_script = "echo hi > /test.txt"
+  metadata_startup_script = "${file("/image/scripts/vm_startup_script.sh")}"
 }
