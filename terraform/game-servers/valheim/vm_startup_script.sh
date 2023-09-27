@@ -85,3 +85,5 @@ EOF
 
 sudo cp start_server_custom.sh /
 chmod u+x Steam/steamapps/common/Valheim dedicated server/start_server_custom.sh
+cd Steam/steamapps/common/Valheim dedicated server/
+.start_server_custom.sh
