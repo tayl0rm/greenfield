@@ -30,16 +30,16 @@ async def valheim_up(ctx):
     await ctx.channel.send('The Valheim Server is spinning up!')
     service = discovery.build('compute', 'v1')
 
-    project = "ga-test-project-503ca"
-    zone = "europe-west1-b"
-    instance = "python-test-instance"
+    project = os.getenv('gcp_project')
+    zone = os.getenv('gcp_zone')
+    instance = os.getenv('gcp_instance')
 
     request = service.instances().start(project=project, zone=zone, instance=instance)
     response = request.execute()
 
     response = service.instances().get(
         project=project, zone=zone, instance=instance).execute()
-        
+
     vahleim_server_ip = response['networkInterfaces'][0]['accessConfigs'][0]['natIP']
 
     await asyncio.sleep(60)
@@ -51,9 +51,9 @@ async def valheim_down(ctx):
     await ctx.channel.send('The Valheim Server is spinning down!')
     service = discovery.build('compute', 'v1')
 
-    project = "ga-test-project-503ca"
-    zone = "europe-west1-b"
-    instance = "python-test-instance"
+    project = os.getenv('gcp_project')
+    zone = os.getenv('gcp_zone')
+    instance = os.getenv('gcp_instance')
 
     request = service.instances().stop(project=project, zone=zone, instance=instance)
     response = request.execute()
@@ -61,4 +61,4 @@ async def valheim_down(ctx):
     await asyncio.sleep(60)
     await ctx.channel.send('The Valheim Server has shutdown, you can use *!vaheim-up* to restart the server!')
 
-bot.run(os.getenv('DISCORD_TOKEN'))  # bot
+bot.run(os.getenv('DISCORD_TOKEN'))
