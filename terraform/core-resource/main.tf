@@ -6,7 +6,6 @@ module "discord_bot" {
   compute_image = "europe-west1-docker.pkg.dev/ga-test-project-503ca/core/discord-bot/discord-bot:latest"
   network       = var.network
   subnetwork    = "${var.network}-subnetwork"
-
   startup_script = "python3 discord_bot/bot.python"
 
   firewall_protocol = "tcp"
@@ -14,7 +13,6 @@ module "discord_bot" {
   firewall_source   = ["35.235.240.0/20"]
 
   service_account_roles = [
-    "roles/storage.objectUser",
     "roles/viewer"
   ]
 }
