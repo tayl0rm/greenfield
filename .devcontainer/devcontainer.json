@@ -10,8 +10,19 @@
 		}
 	},
 	// "forwardPorts": []
-	"postCreateCommand": "pipenv install",
-  	"postAttachCommand": "pipenv shell"
-	// "customizations": {}
 	// "remoteUser": "root"
+	"postCreateCommand": "pipenv install",
+  	"postAttachCommand": "pipenv shell",
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"esbenp.prettier-vscode",
+				"oderwat.indent-rainbow",
+				"vscode-icons-team.vscode-icons",
+				"github.vscode-github-actions"
+			]
+		}
+	}
 }
