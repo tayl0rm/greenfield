@@ -30,17 +30,17 @@ jobs:
 
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
-      run: terraform init terraform/game-servers/valheim
+      run: terraform init -chdir=terraform/game-servers/valheim
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
     # Checks that all Terraform configuration files adhere to a canonical format
     - name: Terraform Format
-      run: terraform fmt -check terraform/game-servers/valheim
+      run: terraform fmt -check -chdir=terraform/game-servers/valheim
 
     # Generates an execution plan for Terraform
     - name: Terraform Plan
-      run: terraform plan terraform/game-servers/valheim
+      run: terraform plan -chdir=terraform/game-servers/valheim
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
@@ -48,6 +48,6 @@ jobs:
       # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve terraform/game-servers/valheim
+      run: terraform apply -auto-approve -chdir=terraform/game-servers/valheim
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}

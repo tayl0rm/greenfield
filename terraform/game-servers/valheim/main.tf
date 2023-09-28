@@ -6,6 +6,7 @@ module "valheim_server" {
   compute_image = "europe-west1-docker.pkg.dev/ga-test-project-503ca/core/valheim/valheim-core:latest"
   network       = var.network
   subnetwork    = var.subnetwork
+
   startup_script = file("scripts/vm_startup_script.sh")
 
   firewall_protocol = "udp"
