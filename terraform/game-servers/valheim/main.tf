@@ -7,7 +7,6 @@ module "valheim_server" {
   network       = var.network
   subnetwork    = var.subnetwork
   startup_script = file("scripts/vm_startup_script.sh")
-
   firewall_protocol = "udp"
   firewall_port     = ["2456-2457"]
   firewall_source   = ["0.0.0.0/0"]
