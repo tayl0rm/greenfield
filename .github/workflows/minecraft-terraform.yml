@@ -8,34 +8,40 @@ on:
       - terraform/game-servers/minecraft/**
   pull_request:
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  minecraft-terraform:
+  minecraft-terraform-setup:
     name: "Terraform"
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
-
       - name: Terraform Init
         working-directory: terraform/game-servers/minecraft
         run: terraform init
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
+  minecraft-terraform-plan:
+    name: "Terraform"
+    runs-on: ubuntu-latest
+    steps:
       - name: Terraform Plan
         working-directory: terraform/game-servers/minecraft
         run: terraform plan
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
+  minecraft-terraform-apply:
+    name: "Terraform"
+    runs-on: ubuntu-latest
+    environment: manual-approval
+    steps:
       - name: Terraform Apply
         working-directory: terraform/game-servers/minecraft
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'

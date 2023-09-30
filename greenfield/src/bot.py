@@ -1,7 +1,6 @@
 import discord
 import os
 import asyncio
-import sys
 
 from discord.ext import commands
 from discord.ext.commands import Bot
@@ -27,7 +26,7 @@ async def valheim_up(ctx):
     valheim_server_name = os.getenv('valheim_server_name')
     valheim_server_password = os.getenv('valheim_server_password')
 
-    await ctx.channel.send('The Valheim Server is spinning up!')
+    await ctx.channel.send("The Valheim server is in the process of starting up, Ol'bean!")
     service = discovery.build('compute', 'v1')
 
     project = os.getenv('gcp_project')
@@ -43,12 +42,12 @@ async def valheim_up(ctx):
     vahleim_server_ip = response['networkInterfaces'][0]['accessConfigs'][0]['natIP']
 
     await asyncio.sleep(60)
-    await ctx.channel.send(f'The Valheim Server, {valheim_server_name}, is accessible at {vahleim_server_ip}! The password is {valheim_server_password}!')
+    await ctx.channel.send(f"I'd like to inform you that the Valheim Server, {valheim_server_name}, is currently accessible at {vahleim_server_ip}! To gain entry, please utilize the password: {valheim_server_password}.")
 
 
 @bot.command(name="valheim-down")
 async def valheim_down(ctx):
-    await ctx.channel.send('The Valheim Server is spinning down!')
+    await ctx.channel.send('The Valheim server is currently shutting down!')
     service = discovery.build('compute', 'v1')
 
     project = os.getenv('gcp_project')
@@ -59,6 +58,6 @@ async def valheim_down(ctx):
     response = request.execute()
 
     await asyncio.sleep(15)
-    await ctx.channel.send('The Valheim Server has shutdown, you can use *!vaheim-up* to restart the server!')
+    await ctx.channel.send("The Valheim server has shut down, as it descends into a slumber. Fear not, you may rekindle the server with the invocation of *!valheim-up*!")
 
 bot.run(os.getenv('DISCORD_TOKEN'))
