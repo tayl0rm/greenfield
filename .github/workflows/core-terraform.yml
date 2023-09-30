@@ -8,10 +8,6 @@ on:
       - terraform/core-resource/**
   pull_request:
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   core-terraform-setup:
     name: "Terraform Plan"
@@ -19,21 +15,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        defaults:
+          run:
+            shell: bash
+
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
+        defaults:
+          run:
+            shell: bash
 
       - name: Terraform Init
         working-directory: terraform/core-resources
         run: terraform init
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        defaults:
+          run:
+            shell: bash
 
       - name: Terraform Plan
         working-directory: terraform/core-resources
         run: terraform plan -out core-terraform-plan
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        defaults:
+          run:
+            shell: bash
 
       - name: Archive Terraform Plan
         working-directory: terraform/core-resources
