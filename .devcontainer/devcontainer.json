@@ -6,7 +6,7 @@
 		"ghcr.io/devcontainers-contrib/features/pipenv:2": {},
 		"ghcr.io/dhoeric/features/google-cloud-cli:1": {},
 		"ghcr.io/devcontainers/features/terraform:1": {
-			"version": "0.13.7"
+			"version": "1.5.7"
 		}
 	},
 	// "forwardPorts": []
