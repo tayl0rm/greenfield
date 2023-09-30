@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'terraform/core-resources/**.tf'
+      - terraform/core-resource/**
   pull_request:
 
 defaults:
