@@ -25,9 +25,3 @@ module "core_network" {
   subnetwork_cidr         = "10.1.0.0/26"
   auto_create_subnetworks = false
 }
-
-//module "backup_bucket" {
-//  source      = "github.com/tayl0rm/terraform-modules/gcs-bucket"
-//  gcp_project = var.gcp_project
-//  name        = "tayl0rm-server-backup"
-// }
