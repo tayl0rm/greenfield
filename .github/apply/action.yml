@@ -45,7 +45,7 @@ runs:
       working-directory: ${{ inputs.terraform_directory }}
       shell: bash
       env:
-        GOOGLE_CREDENTIALS: ${{ inputs.google_sa_key }}
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: |
         terraform init
 
@@ -64,7 +64,7 @@ runs:
       working-directory: ${{ inputs.terraform_directory }}
       shell: bash
       env:
-        GOOGLE_CREDENTIALS: ${{ inputs.google_sa_key }}
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: |
         echo 'apply<<EOF' >> $GITHUB_OUTPUT
         terraform apply -input=false -no-color tfplan >> $GITHUB_OUTPUT 
