@@ -29,7 +29,7 @@ jobs:
         uses: ./.github/apply
         with:
           terraform_sa: ${{ env.TF_SA }}
-          terraform_directory: "terraform/core-resources"
+          terraform_directory: "terraform/core-resource"
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           google_sa_key: ${{ secrets.GOOGLE_CREDENTIALS }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
