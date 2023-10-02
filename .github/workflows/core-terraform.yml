@@ -25,18 +25,21 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
+
+
       - name: Terraform Plan
         working-directory: terraform/core-resources
-        run: terraform plan -out core-terraform-plan
+        shell: bash
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-
-      - name: Archive Terraform Plan
-        working-directory: terraform/core-resources
+        run: terraform plan -no-color -out=core-terraform-plan-output
+    
+      - name: Save Artifact
         uses: actions/upload-artifact@v3
         with:
           name: core-terraform-plan-output
-          path: core-terraform-plan
+          path: terraform/core-resources/core-terraform-plan-output
+
 
   core-terraform-apply:
     name: "Terraform Apply"
