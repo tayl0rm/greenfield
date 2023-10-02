@@ -63,7 +63,7 @@ runs:
       shell: bash
       run: |
         echo 'apply<<EOF' >> $GITHUB_OUTPUT
-        terraform apply -input=false -no-color tfplan >> $GITHUB_OUTPUT
+        terraform apply -var GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS }} -input=false -no-color tfplan >> $GITHUB_OUTPUT 
         echo 'EOF' >> $GITHUB_OUTPUT
 
     - name: Comment Apply
