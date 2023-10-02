@@ -43,6 +43,8 @@ runs:
     - name: Terraform Init
       id: init
       working-directory: ${{ inputs.terraform_directory }}
+      env:
+        GOOGLE_CREDENTIALS: ${{ inputs.google_sa_key }}
       shell: bash
       run: |
         terraform init
@@ -51,6 +53,8 @@ runs:
       id: plan
       working-directory: ${{ inputs.terraform_directory }}
       shell: bash
+      env:
+        GOOGLE_CREDENTIALS: ${{ inputs.google_sa_key }}
       run: |
         echo 'plan<<EOF' >> $GITHUB_OUTPUT
         terraform plan -no-color -out=tfplan >> $GITHUB_OUTPUT
