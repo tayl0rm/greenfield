@@ -17,7 +17,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terraform/core-resources
+        working-directory: terraform/core-resource
 
     steps:
     # Checkout the repository to the GitHub Actions runner
