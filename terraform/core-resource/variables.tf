@@ -21,4 +21,5 @@ variable "gcp_project" {
 variable "network" {
   default = "core"
   type    = string
+  description = "GCP Network resources will be deployed into."
 }

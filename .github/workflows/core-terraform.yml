@@ -1,59 +1,50 @@
-name: "Core - Terraform CI"
+name: 'Core - Terraform'
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - terraform/core-resource/**
+    branches: [ "main" ]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  core-terraform-setup:
-    name: "Terraform Plan"
+  terraform:
+    name: 'Terraform'
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
-
-      - name: Terraform Init
-        working-directory: terraform/core-resources
-        run: terraform init
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-
-
-
-      - name: Terraform Plan
-        working-directory: terraform/core-resources
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
         shell: bash
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-        run: terraform plan -no-color -out=core-terraform-plan-output
-    
-      - name: Save Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: core-terraform-plan-output
-          path: terraform/core-resources/core-terraform-plan-output
+        working-directory: terraform/core-resource
 
-
-  core-terraform-apply:
-    name: "Terraform Apply"
-    runs-on: ubuntu-latest
-    environment: manual-approval
     steps:
-      - name: Download Terraform Plan
-        uses: actions/download-artifact@v3
-        with:
-          name: core-terraform-plan-output
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Terraform Apply
-        working-directory: terraform/core-resources
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve core-terraform-plan
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+ 
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
+      run: terraform init
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }} 
+
+
+    # Generates an execution plan for Terraform
+    - name: Terraform Plan
+      run: terraform plan -input=false
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+      # On push to "main", build or change infrastructure according to Terraform configuration files
+      # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: terraform apply -auto-approve -input=false
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
