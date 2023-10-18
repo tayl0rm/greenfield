@@ -9,12 +9,13 @@ from dotenv import load_dotenv
 from discord import Intents
 from typing import Any
 from googleapiclient import discovery
-from google.cloud import compute_v1
+from google.auth import compute_engine
 
 load_dotenv()
 
-credential_path = "/workspaces/greenfield/gcloud-service-account.json"
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
+credentials = compute_engine.Credentials()
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 intents = discord.Intents.all()
@@ -23,8 +24,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.command(name="valheim-up")
 async def valheim_up(ctx):
-    valheim_server_name = os.getenv('valheim_server_name')
-    valheim_server_password = os.getenv('valheim_server_password')
+    valheim_server_name = "SuperDuperVikingFunTime" #os.getenv('valheim_server_name')
+    valheim_server_password = "SuperDuperVikingFunTime1066" #os.getenv('valheim_server_password')
 
     await ctx.channel.send("The Valheim server is in the process of starting up, Ol'bean!")
     service = discovery.build('compute', 'v1')
@@ -33,7 +34,7 @@ async def valheim_up(ctx):
     zone = os.getenv('gcp_zone')
     instance = os.getenv('gcp_instance')
 
-    request = service.instances().start(project=project, zone=zone, instance=instance)
+    request = service.instances().start(project="ga-test-project-503ca", zone="europe-west1-b", instance="valheim-server")
     response = request.execute()
 
     response = service.instances().get(
@@ -54,7 +55,7 @@ async def valheim_down(ctx):
     zone = os.getenv('gcp_zone')
     instance = os.getenv('gcp_instance')
 
-    request = service.instances().stop(project=project, zone=zone, instance=instance)
+    request = service.instances().stop(project="ga-test-project-503ca", zone="europe-west1-b", instance="valheim-server")
     response = request.execute()
 
     await asyncio.sleep(15)
