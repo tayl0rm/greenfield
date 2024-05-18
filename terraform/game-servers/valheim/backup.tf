@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket      = "terraform_state_backup"
+    bucket      = "mtaylor-terraform-state-backup"
     prefix      = "terraform/state/game-servers/valheim"
   }
 }
