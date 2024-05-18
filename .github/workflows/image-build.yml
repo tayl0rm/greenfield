@@ -38,4 +38,4 @@ jobs:
       working-directory: greenfield/
 
     - name: Push image
-      run: docker push ${{ env.GAR_LOCATION }}
+      run: docker push ${{ env.GAR_LOCATION }}greenfieldbot
