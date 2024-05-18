@@ -9,8 +9,8 @@ on:
 env:
   PROJECT_ID: ga-test-project-503ca
   REGION: europe-west1
-  GAR_LOCATION: europe-west1-docker.pkg.dev/ga-test-project-503ca/mtaylor-images/
-
+  GAR_LOCATION: europe-west1-docker.pkg.dev/ga-test-project-503ca/core/discord-bot/
+  
 jobs:
   build-push-artifact:
     runs-on: ubuntu-latest
