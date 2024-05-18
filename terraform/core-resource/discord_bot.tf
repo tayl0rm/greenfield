@@ -3,7 +3,7 @@ module "discord_bot" {
   gcp_project    = var.gcp_project
   name           = var.bot
   machine_type   = "e2-mirco"
-  compute_image  = "europe-west1-docker.pkg.dev/ga-test-project-503ca/core/discord-bot/discord-bot:latest"
+  compute_image  = "europe-west1-docker.pkg.dev/ga-test-project-503ca/core/discord-bot/greenfieldbot:latest"
   network        = var.network
   subnetwork     = "${var.network}-subnetwork"
   startup_script = "python3 discord_bot/bot.python"
