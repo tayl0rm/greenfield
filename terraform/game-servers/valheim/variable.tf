@@ -1,5 +1,5 @@
 variable "valheim_server" {
-  default = "valheim"
+  default = "valheim-server"
   type    = string
 }
 
