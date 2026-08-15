@@ -35,6 +35,6 @@ jobs:
         with:
           context: ./greenfield
           file: ./greenfield/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: ${{ env.GAR_LOCATION }}/greenfieldbot:latest
