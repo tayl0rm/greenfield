@@ -17,7 +17,7 @@ credentials = compute_engine.Credentials()
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials
 
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+DISCORD_BOT = os.getenv('DISCORD_BOT')
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -61,4 +61,4 @@ async def valheim_down(ctx):
     await asyncio.sleep(15)
     await ctx.channel.send("The Valheim server has shut down, as it descends into a slumber. Fear not, you may rekindle the server with the invocation of *!valheim-up*!")
 
-bot.run(os.getenv('DISCORD_TOKEN'))
+bot.run(os.getenv('DISCORD_BOT'))
