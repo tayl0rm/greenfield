@@ -1,64 +1,113 @@
-import discord
-import os
 import asyncio
+import os
 
+import discord
 from discord.ext import commands
-from discord.ext.commands import Bot
-from discord.utils import get
-from dotenv import load_dotenv
-from discord import Intents
-from typing import Any
 from googleapiclient import discovery
-from google.auth import compute_engine
+from google.oauth2 import service_account
 
-load_dotenv()
 
-credentials = compute_engine.Credentials()
+# Configuration
+DISCORD_BOT = os.getenv("DISCORD_BOT")
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials
+GCP_PROJECT = os.getenv("GCP_PROJECT")
+GCP_ZONE = os.getenv("GCP_ZONE")
+GCP_INSTANCE = os.getenv("GCP_INSTANCE")
 
-DISCORD_BOT = os.getenv('DISCORD_BOT')
+GCP_CREDENTIALS_FILE = os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "/var/secrets/google/credentials.json"
+)
+
+
+# Discord
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
 
 
+# Google Cloud
+def get_compute_service():
+    credentials = service_account.Credentials.from_service_account_file(
+        GCP_CREDENTIALS_FILE
+    )
+
+    return discovery.build(
+        "compute",
+        "v1",
+        credentials=credentials
+    )
+
+
+# Commands
 @bot.command(name="valheim-up")
 async def valheim_up(ctx):
-    valheim_server_name = "SuperDuperVikingFunTime" #os.getenv('valheim_server_name')
-    valheim_server_password = "SuperDuperVikingFunTime1066" #os.getenv('valheim_server_password')
+    valheim_server_name = "SuperDuperVikingFunTime"
+    valheim_server_password = "SuperDuperVikingFunTime1066"
+    await ctx.channel.send(
+        "The Valheim server is in the process of starting up, Ol'bean!"
+    )
+    service = get_compute_service()
+    request = service.instances().start(
+        project=GCP_PROJECT,
+        zone=GCP_ZONE,
+        instance=GCP_INSTANCE
+    )
+    request.execute()
 
-    await ctx.channel.send("The Valheim server is in the process of starting up, Ol'bean!")
-    service = discovery.build('compute', 'v1')
-
-    project = os.getenv('gcp_project')
-    zone = os.getenv('gcp_zone')
-    instance = os.getenv('gcp_instance')
-
-    request = service.instances().start(project="ga-test-project-503ca", zone="europe-west1-b", instance="valheim-server")
-    response = request.execute()
-
-    response = service.instances().get(
-        project=project, zone=zone, instance=instance).execute()
-
-    vahleim_server_ip = response['networkInterfaces'][0]['accessConfigs'][0]['natIP']
-
+    # Wait for the server to start
     await asyncio.sleep(60)
-    await ctx.channel.send(f"I'd like to inform you that the Valheim Server, {valheim_server_name}, is currently accessible at {vahleim_server_ip}! To gain entry, please utilize the password: {valheim_server_password}.")
+    response = service.instances().get(
+        project=GCP_PROJECT,
+        zone=GCP_ZONE,
+        instance=GCP_INSTANCE
+    ).execute()
+    valheim_server_ip = (
+        response["networkInterfaces"][0]
+        ["accessConfigs"][0]
+        ["natIP"]
+    )
+    await ctx.channel.send(
+        f"I'd like to inform you that the Valheim Server, "
+        f"{valheim_server_name}, is currently accessible at "
+        f"{valheim_server_ip}! "
+        f"To gain entry, please utilize the password: "
+        f"{valheim_server_password}."
+    )
 
 
 @bot.command(name="valheim-down")
 async def valheim_down(ctx):
-    await ctx.channel.send('The Valheim server is currently shutting down!')
-    service = discovery.build('compute', 'v1')
-
-    project = os.getenv('gcp_project')
-    zone = os.getenv('gcp_zone')
-    instance = os.getenv('gcp_instance')
-
-    request = service.instances().stop(project="ga-test-project-503ca", zone="europe-west1-b", instance="valheim-server")
-    response = request.execute()
-
+    await ctx.channel.send(
+        "The Valheim server is currently shutting down!"
+    )
+    service = get_compute_service()
+    request = service.instances().stop(
+        project=GCP_PROJECT,
+        zone=GCP_ZONE,
+        instance=GCP_INSTANCE
+    )
+    request.execute()
     await asyncio.sleep(15)
-    await ctx.channel.send("The Valheim server has shut down, as it descends into a slumber. Fear not, you may rekindle the server with the invocation of *!valheim-up*!")
+    await ctx.channel.send(
+        "The Valheim server has shut down, as it descends into a slumber. "
+        "Fear not, you may rekindle the server with the invocation of "
+        "*!valheim-up*!"
+    )
 
-bot.run(os.getenv('DISCORD_BOT'))
+
+# Start bot
+if not DISCORD_BOT:
+    raise RuntimeError("DISCORD_BOT environment variable is not set")
+if not GCP_PROJECT:
+    raise RuntimeError("GCP_PROJECT environment variable is not set")
+if not GCP_ZONE:
+    raise RuntimeError("GCP_ZONE environment variable is not set")
+if not GCP_INSTANCE:
+    raise RuntimeError("GCP_INSTANCE environment variable is not set")
+
+
+bot.run(DISCORD_BOT)
