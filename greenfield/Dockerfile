@@ -1,11 +1,20 @@
-FROM google/cloud-sdk:417.0.1-alpine
+FROM python:3.12-alpine
 
-# Install Tools
-RUN apk --no-cache add curl jq coreutils zip python3 && ln -sf python3 /usr/bin/python && \
-    python3 -m ensurepip && \
-    pip3 install --no-cache --upgrade pip setuptools && \
-    mkdir ~/discord_bot
+WORKDIR /app
 
-COPY src/bot.py ~/discord_bot/bot.python
+RUN apk add --no-cache \
+    curl \
+    jq \
+    coreutils \
+    zip
 
-RUN python3 -m pip install discord python-dotenv google-api-core google-api-python-client google-cloud-compute
+COPY src/bot.py ./bot.py
+
+RUN pip install --no-cache-dir \
+    discord \
+    python-dotenv \
+    google-api-core \
+    google-api-python-client \
+    google-cloud-compute
+
+CMD ["python", "bot.py"]
