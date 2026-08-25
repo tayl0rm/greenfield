@@ -8,14 +8,12 @@ RUN apk add --no-cache \
     coreutils \
     zip
 
-COPY src/bot.py ./bot.py
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN python3 -m pip install \
-    discord \
-    python-dotenv \
-    google-api-core \
-    google-api-python-client \
-    google-cloud-compute \
-    google-cloud-secret-manager
+COPY pyproject.toml uv.lock ./
 
-CMD ["python", "bot.py"]
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY src/ ./src/
+
+CMD ["python", "src/bot.py"]

@@ -3,10 +3,9 @@ import os
 
 import discord
 from discord.ext import commands
-from googleapiclient import discovery
-from google.oauth2 import service_account
 from google.cloud import secretmanager
-
+from google.oauth2 import service_account
+from googleapiclient import discovery
 
 # ============================================================
 # Configuration
@@ -19,13 +18,11 @@ GCP_ZONE = os.getenv("GCP_ZONE")
 GCP_INSTANCE = os.getenv("GCP_INSTANCE")
 
 GCP_CREDENTIALS_FILE = os.getenv(
-    "GOOGLE_APPLICATION_CREDENTIALS",
-    "/var/secrets/google/credentials.json"
+    "GOOGLE_APPLICATION_CREDENTIALS", "/var/secrets/google/credentials.json"
 )
 
 VALHEIM_PASSWORD_SECRET = os.getenv(
-    "VALHEIM_PASSWORD_SECRET",
-    "valheim-server-password"
+    "VALHEIM_PASSWORD_SECRET", "valheim-server-password"
 )
 
 
@@ -35,38 +32,28 @@ VALHEIM_PASSWORD_SECRET = os.getenv(
 
 intents = discord.Intents.all()
 
-bot = commands.Bot(
-    command_prefix="!",
-    intents=intents
-)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 # ============================================================
 # Google Cloud
 # ============================================================
 
+
 def get_google_credentials():
-    return service_account.Credentials.from_service_account_file(
-        GCP_CREDENTIALS_FILE
-    )
+    return service_account.Credentials.from_service_account_file(GCP_CREDENTIALS_FILE)
 
 
 def get_compute_service():
     credentials = get_google_credentials()
 
-    return discovery.build(
-        "compute",
-        "v1",
-        credentials=credentials
-    )
+    return discovery.build("compute", "v1", credentials=credentials)
 
 
 def get_secret_manager_client():
     credentials = get_google_credentials()
 
-    return secretmanager.SecretManagerServiceClient(
-        credentials=credentials
-    )
+    return secretmanager.SecretManagerServiceClient(credentials=credentials)
 
 
 def get_valheim_password():
@@ -78,16 +65,10 @@ def get_valheim_password():
     client = get_secret_manager_client()
 
     secret_name = (
-        f"projects/{GCP_PROJECT}"
-        f"/secrets/{VALHEIM_PASSWORD_SECRET}"
-        f"/versions/latest"
+        f"projects/{GCP_PROJECT}/secrets/{VALHEIM_PASSWORD_SECRET}/versions/latest"
     )
 
-    response = client.access_secret_version(
-        request={
-            "name": secret_name
-        }
-    )
+    response = client.access_secret_version(request={"name": secret_name})
 
     return response.payload.data.decode("UTF-8")
 
@@ -95,6 +76,7 @@ def get_valheim_password():
 # ============================================================
 # Commands
 # ============================================================
+
 
 @bot.command(name="valheim-up")
 async def valheim_up(ctx):
@@ -113,11 +95,11 @@ async def valheim_up(ctx):
         # ----------------------------------------------------
 
         try:
-            instance = service.instances().get(
-                project=GCP_PROJECT,
-                zone=GCP_ZONE,
-                instance=GCP_INSTANCE
-            ).execute()
+            instance = (
+                service.instances()
+                .get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE)
+                .execute()
+            )
 
         except Exception as exc:
             error_text = str(exc)
@@ -138,9 +120,7 @@ async def valheim_up(ctx):
         status = instance.get("status")
 
         if status == "RUNNING":
-            await ctx.channel.send(
-                "The Valheim server is already running."
-            )
+            await ctx.channel.send("The Valheim server is already running.")
             return
 
         if status not in ("TERMINATED", "STOPPED"):
@@ -155,9 +135,7 @@ async def valheim_up(ctx):
         # ----------------------------------------------------
 
         service.instances().start(
-            project=GCP_PROJECT,
-            zone=GCP_ZONE,
-            instance=GCP_INSTANCE
+            project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE
         ).execute()
 
         await ctx.channel.send(
@@ -173,25 +151,20 @@ async def valheim_up(ctx):
         poll_interval = 10
 
         for attempt in range(max_attempts):
-
             await asyncio.sleep(poll_interval)
 
-            instance = service.instances().get(
-                project=GCP_PROJECT,
-                zone=GCP_ZONE,
-                instance=GCP_INSTANCE
-            ).execute()
+            instance = (
+                service.instances()
+                .get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE)
+                .execute()
+            )
 
             status = instance.get("status")
 
             if status == "RUNNING":
                 break
 
-            if status not in (
-                "PROVISIONING",
-                "STAGING",
-                "RUNNING"
-            ):
+            if status not in ("PROVISIONING", "STAGING", "RUNNING"):
                 await ctx.channel.send(
                     f"The Valheim server failed to start. "
                     f"Current instance state: `{status}`."
@@ -209,18 +182,17 @@ async def valheim_up(ctx):
         # Retrieve server IP
         # ----------------------------------------------------
 
-        response = service.instances().get(
-            project=GCP_PROJECT,
-            zone=GCP_ZONE,
-            instance=GCP_INSTANCE
-        ).execute()
+        response = (
+            service.instances()
+            .get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE)
+            .execute()
+        )
 
         interfaces = response.get("networkInterfaces", [])
 
         if not interfaces:
             await ctx.channel.send(
-                "The Valheim server is running, but no network "
-                "interface was found yet."
+                "The Valheim server is running, but no network interface was found yet."
             )
             return
 
@@ -228,8 +200,7 @@ async def valheim_up(ctx):
 
         if not access_configs:
             await ctx.channel.send(
-                "The Valheim server is running, but no external "
-                "IP address was found."
+                "The Valheim server is running, but no external IP address was found."
             )
             return
 
@@ -247,8 +218,7 @@ async def valheim_up(ctx):
         # ----------------------------------------------------
 
         await ctx.channel.send(
-            "The VM is running. Waiting for the Valheim server "
-            "to finish starting..."
+            "The VM is running. Waiting for the Valheim server to finish starting..."
         )
 
         await asyncio.sleep(60)
@@ -282,9 +252,7 @@ async def valheim_up(ctx):
 @bot.command(name="valheim-down")
 async def valheim_down(ctx):
 
-    await ctx.channel.send(
-        "The Valheim server is currently shutting down!"
-    )
+    await ctx.channel.send("The Valheim server is currently shutting down!")
 
     try:
         service = get_compute_service()
@@ -294,19 +262,17 @@ async def valheim_down(ctx):
         # ----------------------------------------------------
 
         try:
-            instance = service.instances().get(
-                project=GCP_PROJECT,
-                zone=GCP_ZONE,
-                instance=GCP_INSTANCE
-            ).execute()
+            instance = (
+                service.instances()
+                .get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE)
+                .execute()
+            )
 
         except Exception as exc:
             error_text = str(exc)
 
             if "404" in error_text or "notFound" in error_text:
-                await ctx.channel.send(
-                    "The Valheim server instance doesn't exist."
-                )
+                await ctx.channel.send("The Valheim server instance doesn't exist.")
                 return
 
             raise
@@ -314,9 +280,7 @@ async def valheim_down(ctx):
         status = instance.get("status")
 
         if status == "TERMINATED":
-            await ctx.channel.send(
-                "The Valheim server is already shut down."
-            )
+            await ctx.channel.send("The Valheim server is already shut down.")
             return
 
         if status != "RUNNING":
@@ -331,14 +295,10 @@ async def valheim_down(ctx):
         # ----------------------------------------------------
 
         service.instances().stop(
-            project=GCP_PROJECT,
-            zone=GCP_ZONE,
-            instance=GCP_INSTANCE
+            project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE
         ).execute()
 
-        await ctx.channel.send(
-            "The Valheim server has been instructed to shut down."
-        )
+        await ctx.channel.send("The Valheim server has been instructed to shut down.")
 
         # ----------------------------------------------------
         # Poll for termination
@@ -348,14 +308,13 @@ async def valheim_down(ctx):
         poll_interval = 5
 
         for _ in range(max_attempts):
-
             await asyncio.sleep(poll_interval)
 
-            instance = service.instances().get(
-                project=GCP_PROJECT,
-                zone=GCP_ZONE,
-                instance=GCP_INSTANCE
-            ).execute()
+            instance = (
+                service.instances()
+                .get(project=GCP_PROJECT, zone=GCP_ZONE, instance=GCP_INSTANCE)
+                .execute()
+            )
 
             status = instance.get("status")
 
@@ -371,7 +330,6 @@ async def valheim_down(ctx):
         await ctx.channel.send(
             "The Valheim server is shutting down, but is taking "
             "longer than expected. Check again shortly."
-
         )
 
     except Exception:
@@ -388,24 +346,16 @@ async def valheim_down(ctx):
 # ============================================================
 
 if not DISCORD_BOT:
-    raise RuntimeError(
-        "DISCORD_BOT environment variable is not set"
-    )
+    raise RuntimeError("DISCORD_BOT environment variable is not set")
 
 if not GCP_PROJECT:
-    raise RuntimeError(
-        "GCP_PROJECT environment variable is not set"
-    )
+    raise RuntimeError("GCP_PROJECT environment variable is not set")
 
 if not GCP_ZONE:
-    raise RuntimeError(
-        "GCP_ZONE environment variable is not set"
-    )
+    raise RuntimeError("GCP_ZONE environment variable is not set")
 
 if not GCP_INSTANCE:
-    raise RuntimeError(
-        "GCP_INSTANCE environment variable is not set"
-    )
+    raise RuntimeError("GCP_INSTANCE environment variable is not set")
 
 
 # ============================================================
