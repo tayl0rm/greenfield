@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:1-3.13-bookworm
+FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -9,5 +9,3 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /workspaces/app
 
 ENV PATH="/workspaces/app/.venv/bin:$PATH"
-
-RUN if [ -f pyproject.toml ]; then uv sync --frozen; fi

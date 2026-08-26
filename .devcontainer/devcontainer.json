@@ -1,11 +1,19 @@
 {
     "name": "GreenfieldBot",
+
     "build": {
         "dockerfile": "Dockerfile",
         "context": ".."
     },
+
+    "features": {
+        "ghcr.io/devcontainers/features/git-lfs:1": {}
+    },
+
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-    "postCreateCommand": "uv sync",
+
+    "postCreateCommand": "git lfs install && uv sync",
+
     "customizations": {
         "vscode": {
             "extensions": [
@@ -19,5 +27,6 @@
             }
         }
     },
+
     "remoteUser": "vscode"
 }
