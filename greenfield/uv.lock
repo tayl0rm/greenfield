@@ -383,7 +383,7 @@ grpc = [
 [[package]]
 name = "greenfieldbot"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "discord-py" },
     { name = "google-api-core" },

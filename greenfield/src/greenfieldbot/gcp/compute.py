@@ -1,6 +1,5 @@
 from google.oauth2 import service_account
 from googleapiclient import discovery
-
 from greenfieldbot.config import Config
 
 

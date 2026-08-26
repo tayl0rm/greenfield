@@ -27,13 +27,9 @@ class Config:
             "GCP_INSTANCE": cls.gcp_instance,
         }
 
-        missing = [
-            name for name, value in required.items()
-            if not value
-        ]
+        missing = [name for name, value in required.items() if not value]
 
         if missing:
             raise RuntimeError(
-                f"Required environment variables are missing: "
-                f"{', '.join(missing)}"
+                f"Required environment variables are missing: {', '.join(missing)}"
             )

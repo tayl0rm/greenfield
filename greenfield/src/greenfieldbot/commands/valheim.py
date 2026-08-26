@@ -43,9 +43,7 @@ def setup(bot):
             status = instance.get("status")
 
             if status == "RUNNING":
-                await ctx.channel.send(
-                    "The Valheim server is already running."
-                )
+                await ctx.channel.send("The Valheim server is already running.")
                 return
 
             if status not in ("TERMINATED", "STOPPED"):
@@ -140,9 +138,7 @@ def setup(bot):
     @bot.command(name="valheim-down")
     async def valheim_down(ctx):
 
-        await ctx.channel.send(
-            "The Valheim server is currently shutting down!"
-        )
+        await ctx.channel.send("The Valheim server is currently shutting down!")
 
         try:
             service = get_compute_service()
@@ -158,9 +154,7 @@ def setup(bot):
                 error_text = str(exc)
 
                 if "404" in error_text or "notFound" in error_text:
-                    await ctx.channel.send(
-                        "The Valheim server instance doesn't exist."
-                    )
+                    await ctx.channel.send("The Valheim server instance doesn't exist.")
                     return
 
                 raise
@@ -168,9 +162,7 @@ def setup(bot):
             status = instance.get("status")
 
             if status == "TERMINATED":
-                await ctx.channel.send(
-                    "The Valheim server is already shut down."
-                )
+                await ctx.channel.send("The Valheim server is already shut down.")
                 return
 
             if status != "RUNNING":

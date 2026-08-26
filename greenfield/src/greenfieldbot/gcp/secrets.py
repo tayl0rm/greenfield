@@ -1,15 +1,12 @@
 from google.cloud import secretmanager
-
-from greenfieldbot.gcp.compute import get_google_credentials
 from greenfieldbot.config import Config
+from greenfieldbot.gcp.compute import get_google_credentials
 
 
 def get_secret_manager_client():
     credentials = get_google_credentials()
 
-    return secretmanager.SecretManagerServiceClient(
-        credentials=credentials
-    )
+    return secretmanager.SecretManagerServiceClient(credentials=credentials)
 
 
 def get_valheim_password():
@@ -21,8 +18,6 @@ def get_valheim_password():
         f"/versions/latest"
     )
 
-    response = client.access_secret_version(
-        request={"name": secret_name}
-    )
+    response = client.access_secret_version(request={"name": secret_name})
 
     return response.payload.data.decode("UTF-8")
