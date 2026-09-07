@@ -8,6 +8,7 @@ from greenfieldbot.gcp.compute import (
     stop_instance,
 )
 from greenfieldbot.gcp.secrets import get_valheim_password
+from greenfieldbot.services.valheim_monitor import ValheimMonitor
 
 
 def setup(bot):
@@ -128,6 +129,25 @@ def setup(bot):
                 f"Server password: **{password}**"
             )
 
+            # ----------------------------------------------------
+            # Start activity monitor
+            # ----------------------------------------------------
+
+            # Stop any existing monitor first. This prevents
+            # multiple 5-hour timers from being created if
+            # !valheim-up is invoked more than once.
+            existing_monitor = getattr(bot, "valheim_monitor", None)
+
+            if existing_monitor:
+                await existing_monitor.stop()
+
+            bot.valheim_monitor = ValheimMonitor(
+                bot=bot,
+                channel_id=ctx.channel.id,
+            )
+
+            bot.valheim_monitor.start()
+
         except Exception:
             await ctx.channel.send(
                 "Something went wrong while starting the Valheim server. "
@@ -141,6 +161,20 @@ def setup(bot):
         await ctx.channel.send("The Valheim server is currently shutting down!")
 
         try:
+            # ----------------------------------------------------
+            # Stop activity monitor
+            # ----------------------------------------------------
+
+            monitor = getattr(bot, "valheim_monitor", None)
+
+            if monitor:
+                await monitor.stop()
+                bot.valheim_monitor = None
+
+            # ----------------------------------------------------
+            # Get compute service
+            # ----------------------------------------------------
+
             service = get_compute_service()
 
             # ----------------------------------------------------
