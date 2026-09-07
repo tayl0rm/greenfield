@@ -10,11 +10,23 @@ from greenfieldbot.gcp.compute import (
 
 logger = logging.getLogger(__name__)
 
-CHECK_INTERVAL = 3 * 60 
-RESPONSE_TIMEOUT = 1 * 60
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+CHECK_INTERVAL = 3 * 60 * 60  # 5 hours
+RESPONSE_TIMEOUT = 1 * 60  # 15 minutes
+
+
+# ---------------------------------------------------------------------------
+# Discord confirmation view
+# ---------------------------------------------------------------------------
 
 
 class ServerCheckView(discord.ui.View):
+    """Discord UI asking whether the Valheim server should remain online."""
+
     def __init__(self, monitor: "ValheimMonitor"):
         super().__init__(timeout=RESPONSE_TIMEOUT)
 
@@ -28,6 +40,9 @@ class ServerCheckView(discord.ui.View):
         action: str,
         message: str,
     ):
+        """Handle a response from either button."""
+
+        # Prevent multiple interactions from being processed.
         if self.action is not None:
             return
 
@@ -71,21 +86,37 @@ class ServerCheckView(discord.ui.View):
         )
 
     async def on_timeout(self):
+        """Handle the user not responding within the timeout period."""
+
         if self.action is not None:
             return
 
         self.action = "timeout"
-
         self.response.set()
 
 
+# ---------------------------------------------------------------------------
+# Valheim monitor
+# ---------------------------------------------------------------------------
+
+
 class ValheimMonitor:
+    """Monitors the Valheim server and periodically asks whether it is still
+    being used.
+    """
+
     def __init__(self, bot, channel_id: int):
         self.bot = bot
         self.channel_id = channel_id
         self.task: asyncio.Task | None = None
 
+    # -----------------------------------------------------------------------
+    # Lifecycle
+    # -----------------------------------------------------------------------
+
     def start(self):
+        """Start the monitor if it is not already running."""
+
         if self.task and not self.task.done():
             logger.info("Valheim monitor is already running.")
             return
@@ -95,12 +126,15 @@ class ValheimMonitor:
         logger.info("Valheim monitor started.")
 
     async def stop(self):
+        """Stop the monitor task."""
+
         if not self.task or self.task.done():
             self.task = None
             return
 
         current_task = asyncio.current_task()
 
+        # Don't attempt to cancel ourselves.
         if self.task is current_task:
             return
 
@@ -115,60 +149,50 @@ class ValheimMonitor:
 
         logger.info("Valheim monitor stopped.")
 
+    # -----------------------------------------------------------------------
+    # Monitoring
+    # -----------------------------------------------------------------------
+
     async def _monitor(self):
+        """Main monitoring loop."""
+
         try:
             while True:
-                logger.info("Valheim activity monitor sleeping for 5 hours.")
+                logger.info(
+                    "Valheim activity monitor sleeping for %s hours.",
+                    CHECK_INTERVAL / 3600,
+                )
 
                 await asyncio.sleep(CHECK_INTERVAL)
 
-                service = get_compute_service()
-                instance = get_instance(service)
-
-                if instance.get("status") != "RUNNING":
+                if not self._is_server_running():
                     logger.info(
                         "Valheim server is no longer running. Stopping monitor."
                     )
                     return
 
-                channel = self.bot.get_channel(self.channel_id)
+                channel = self._get_channel()
 
                 if channel is None:
-                    logger.error(
-                        "Could not find Discord channel %s.",
-                        self.channel_id,
-                    )
                     return
 
-                view = ServerCheckView(self)
+                action = await self._ask_if_server_is_still_active(channel)
 
-                await channel.send(
-                    "🎮 **Is anyone still playing on the Valheim server?**\n\n"
-                    "The server has been running for 5 hours. "
-                    "Please select **Yes** if someone is still playing.\n\n"
-                    "If nobody responds within 15 minutes, "
-                    "the server will automatically shut down.",
-                    view=view,
-                )
-
-                await view.response.wait()
-
-                if view.action == "yes":
+                if action == "yes":
                     logger.info(
                         "Valheim server confirmed active. "
                         "Starting another 5-hour period."
                     )
                     continue
 
-                if view.action in ("no", "timeout"):
-                    if view.action == "timeout":
-                        await channel.send(
-                            "⏰ Nobody responded within 15 minutes. "
-                            "The Valheim server will now shut down."
-                        )
+                if action == "timeout":
+                    await channel.send(
+                        "⏰ Nobody responded within 15 minutes. "
+                        "The Valheim server will now shut down."
+                    )
 
-                    await self.shutdown()
-                    return
+                await self.shutdown()
+                return
 
         except asyncio.CancelledError:
             logger.info("Valheim monitor cancelled.")
@@ -177,12 +201,84 @@ class ValheimMonitor:
         except Exception:
             logger.exception("Valheim monitor failed.")
 
+    # -----------------------------------------------------------------------
+    # GCE state
+    # -----------------------------------------------------------------------
+
+    def _is_server_running(self) -> bool:
+        """Return True if the Valheim GCE instance is running."""
+
+        service = get_compute_service()
+        instance = get_instance(service)
+
+        status = instance.get("status")
+
+        logger.info(
+            "Valheim GCE instance status: %s",
+            status,
+        )
+
+        return status == "RUNNING"
+
+    # -----------------------------------------------------------------------
+    # Discord
+    # -----------------------------------------------------------------------
+
+    def _get_channel(self):
+        """Return the configured Discord channel."""
+
+        channel = self.bot.get_channel(self.channel_id)
+
+        if channel is None:
+            logger.error(
+                "Could not find Discord channel %s.",
+                self.channel_id,
+            )
+
+        return channel
+
+    async def _ask_if_server_is_still_active(
+        self,
+        channel,
+    ) -> str:
+        """Ask Discord whether anybody is still playing.
+
+        Returns:
+            "yes"
+            "no"
+            "timeout"
+        """
+
+        view = ServerCheckView(self)
+
+        await channel.send(
+            "🎮 **Is anyone still playing on the Valheim server?**\n\n"
+            "The server has been running for 5 hours. "
+            "Please select **Yes** if someone is still playing.\n\n"
+            "If nobody responds within 15 minutes, "
+            "the server will automatically shut down.",
+            view=view,
+        )
+
+        await view.response.wait()
+
+        logger.info(
+            "Valheim activity response received: %s",
+            view.action,
+        )
+
+        return view.action
+
+    # -----------------------------------------------------------------------
+    # Shutdown
+    # -----------------------------------------------------------------------
+
     async def shutdown(self):
         """Stop the Valheim server and terminate monitoring."""
 
         service = get_compute_service()
-
         instance = get_instance(service)
+
         status = instance.get("status")
 
         if status != "RUNNING":
