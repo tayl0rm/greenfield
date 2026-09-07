@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-CHECK_INTERVAL = 3 * 60  # 5 hours
-RESPONSE_TIMEOUT = 1 * 60  # 15 minutes
+CHECK_INTERVAL = 5 * 60 * 60 # 5 hours
+RESPONSE_TIMEOUT = 15 * 60  # 15 minutes
 
 
 # ---------------------------------------------------------------------------
