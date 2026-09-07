@@ -10,8 +10,8 @@ from greenfieldbot.gcp.compute import (
 
 logger = logging.getLogger(__name__)
 
-CHECK_INTERVAL = 5 * 60 * 60
-RESPONSE_TIMEOUT = 15 * 60
+CHECK_INTERVAL = 3 * 60 
+RESPONSE_TIMEOUT = 1 * 60
 
 
 class ServerCheckView(discord.ui.View):
