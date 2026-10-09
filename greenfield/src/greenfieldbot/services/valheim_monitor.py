@@ -12,10 +12,10 @@ from greenfieldbot.gcp.compute import (
 
 logger = logging.getLogger(__name__)
 
-# Check for players every five hours.
-CHECK_INTERVAL = 5 * 60 * 60
+# Check for players every minute.
+CHECK_INTERVAL = 60
 
-# Wait up to 15 minutes before shutting down an empty server.
+# Wait 15 minutes before shutting down an empty server.
 RESPONSE_TIMEOUT = 15 * 60
 
 # Recheck player activity every minute during the grace period.
@@ -61,51 +61,50 @@ class ValheimMonitor:
         self._monitor_task = None
 
     async def _monitor(self):
-        """Periodically check server activity and stop an idle VM safely."""
+        """Check activity regularly and stop the VM after 15 idle minutes."""
         while True:
             try:
-                logger.info(
-                    "Next Valheim activity check in %.1f hours.",
-                    CHECK_INTERVAL / 3600,
-                )
-                await asyncio.sleep(CHECK_INTERVAL)
-
-                # Run Google Cloud API calls outside the event loop.
                 service = await asyncio.to_thread(get_compute_service)
                 instance = await asyncio.to_thread(get_instance, service)
 
                 status = instance.get("status")
 
                 if status != "RUNNING":
-                    logger.info(
-                        "Valheim VM is %s; will check again in five hours.",
+                    logger.debug(
+                        "Valheim VM is %s; checking again in %d seconds.",
                         status or "in an unknown state",
+                        CHECK_INTERVAL,
                     )
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
                 host = get_external_ip(instance)
 
                 if not host:
                     logger.warning(
-                        "Valheim VM has no external IP; skipping this activity check."
+                        "Valheim VM has no external IP; will retry in %d seconds.",
+                        CHECK_INTERVAL,
                     )
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
                 player_count = await self._get_player_count(host)
 
-                # A failed query is not evidence that the server is empty.
                 if player_count is None:
                     logger.warning(
                         "Could not determine Valheim player count; "
-                        "keeping the VM running."
+                        "keeping the VM running and retrying in %d seconds.",
+                        CHECK_INTERVAL,
                     )
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
                 if player_count > 0:
-                    logger.info(
-                        "Valheim has %d player(s) online; keeping the VM running.",
+                    logger.debug(
+                        "Valheim has %d player(s) online.",
                         player_count,
                     )
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
                 logger.info(
@@ -121,18 +120,18 @@ class ValheimMonitor:
 
                 if result == "unknown":
                     logger.warning(
-                        "Player count became unknown during the grace "
-                        "period; cancelling shutdown."
+                        "Player count became unknown during the grace period; "
+                        "cancelling shutdown."
                     )
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
-                # The grace period elapsed with repeated successful,
-                # zero-player responses. Verify again immediately before
-                # requesting VM shutdown.
+                # Verify again immediately before requesting shutdown.
                 final_count = await self._get_player_count(host)
 
                 if final_count is None:
                     logger.warning("Final A2S query failed; cancelling shutdown.")
+                    await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
                 if final_count > 0:
@@ -144,16 +143,20 @@ class ValheimMonitor:
 
                 await self._shutdown_vm()
 
+                # Avoid repeatedly querying the VM immediately after shutdown.
+                await asyncio.sleep(CHECK_INTERVAL)
+
             except asyncio.CancelledError:
                 logger.info("Valheim monitor task cancelled.")
                 raise
 
             except Exception:
-                # Keep the monitor alive if one monitoring cycle fails.
                 logger.exception(
                     "Unexpected error during Valheim monitoring cycle. "
-                    "Will retry in five hours."
+                    "Retrying in %d seconds.",
+                    CHECK_INTERVAL,
                 )
+                await asyncio.sleep(CHECK_INTERVAL)
 
     async def _get_player_count(self, host: str) -> int | None:
         """
@@ -208,10 +211,11 @@ class ValheimMonitor:
             "empty"   - the entire grace period passed with zero players.
             "unknown" - a query failed, so shutdown cannot be confirmed.
         """
-        deadline = asyncio.get_running_loop().time() + RESPONSE_TIMEOUT
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + RESPONSE_TIMEOUT
 
         while True:
-            remaining = deadline - asyncio.get_running_loop().time()
+            remaining = deadline - loop.time()
 
             if remaining <= 0:
                 logger.info("The 15-minute grace period elapsed with no players.")
@@ -233,10 +237,7 @@ class ValheimMonitor:
 
             logger.info(
                 "Grace-period check: zero players. %.0f seconds remaining.",
-                max(
-                    0,
-                    deadline - asyncio.get_running_loop().time(),
-                ),
+                max(0, deadline - loop.time()),
             )
 
     async def _shutdown_vm(self):
