@@ -220,7 +220,7 @@ def setup(bot):
 
     @bot.command(name="player")
     async def player(ctx):
-        """Show the current player count and any names returned by A2S."""
+        """Show the current Valheim player count."""
 
         try:
             # Check whether the VM is running.
@@ -238,51 +238,27 @@ def setup(bot):
                 await ctx.send("The server's external IP address is not available.")
                 return
 
-            address = (server_ip, A2S_PORT)
-
-            # Query player count.
+            # Query player count only; Valheim A2S does not reliably
+            # provide individual player names.
             info = await asyncio.to_thread(
                 a2s.info,
-                address,
+                (server_ip, A2S_PORT),
                 timeout=A2S_QUERY_TIMEOUT,
             )
-
-            # Query individual player names separately.
-            try:
-                players = await asyncio.to_thread(
-                    a2s.players,
-                    address,
-                    timeout=A2S_QUERY_TIMEOUT,
-                )
-            except Exception:
-                logger.exception("Failed to retrieve Valheim player names")
-                players = None
 
             count = info.player_count
             maximum = info.max_players
 
-            message = [f"**Valheim players online: {count}/{maximum}**"]
-
-            if players is None:
-                message.append("Player names could not be retrieved.")
-            else:
-                names = sorted(
-                    {p.name.strip() for p in players if p.name and p.name.strip()},
-                    key=str.casefold,
+            if count == 0:
+                await ctx.send(
+                    f"**Valheim players online: {count}/{maximum}**\nNobody is online."
                 )
-
-                if names:
-                    message.extend(f"• {name}" for name in names)
-                elif count > 0:
-                    message.append(
-                        "The server reports players online, "
-                        "but their names weren't returned by the query."
-                    )
-                else:
-                    message.append("Nobody is online.")
-
-            await ctx.send("\n".join(message))
+            else:
+                await ctx.send(f"**Valheim players online: {count}/{maximum}**")
 
         except Exception:
-            logger.exception("Failed to query Valheim player status")
-            await ctx.send("Unable to retrieve player status. Check the bot logs.")
+            logger.exception("Failed to query Valheim player count")
+            await ctx.send(
+                "Unable to retrieve the player count. "
+                "Check the bot logs for more information."
+            )
