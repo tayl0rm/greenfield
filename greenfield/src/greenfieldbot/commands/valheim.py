@@ -101,7 +101,7 @@ def setup(bot):
                 )
                 return
 
-            # Wait for Valheim
+            # Wait for Valheim to finish starting
             await ctx.channel.send(
                 "The VM is running. Waiting for the Valheim server "
                 "to finish starting..."
@@ -119,7 +119,7 @@ def setup(bot):
                 f"Server password: **{password}**"
             )
 
-            # Start activity monitor
+            # Stop any existing monitor to avoid duplicate timers.
             existing_monitor = getattr(bot, "valheim_monitor", None)
 
             if existing_monitor:
@@ -129,15 +129,15 @@ def setup(bot):
                 bot=bot,
                 channel_id=ctx.channel.id,
             )
+
             bot.valheim_monitor.start()
 
         except Exception:
-            logger.exception("Failed to start Valheim server")
+            logger.exception("Failed to start the Valheim server")
             await ctx.channel.send(
                 "Something went wrong while starting the Valheim server. "
                 "Check the bot logs for more information."
             )
-            raise
 
     @bot.command(name="valheim-down")
     async def valheim_down(ctx):
@@ -169,7 +169,7 @@ def setup(bot):
 
             status = instance.get("status")
 
-            if status in ("TERMINATED", "STOPPED"):
+            if status == "TERMINATED":
                 await ctx.channel.send("The Valheim server is already shut down.")
                 return
 
@@ -197,7 +197,7 @@ def setup(bot):
                 instance = await asyncio.to_thread(get_instance, service)
                 status = instance.get("status")
 
-                if status in ("TERMINATED", "STOPPED"):
+                if status == "TERMINATED":
                     await ctx.channel.send(
                         "The Valheim server has shut down, "
                         "as it descends into a slumber. Fear not, "
@@ -212,73 +212,77 @@ def setup(bot):
             )
 
         except Exception:
-            logger.exception("Failed to stop Valheim server")
+            logger.exception("Failed to stop the Valheim server")
             await ctx.channel.send(
                 "Something went wrong while shutting down the "
                 "Valheim server. Check the bot logs for more information."
             )
-            raise
 
     @bot.command(name="player")
-    async def player(ctx, *, player_name: str = None):
-        """Check Valheim's online player count or search by player name."""
+    async def player(ctx):
+        """Show the current player count and any names returned by A2S."""
+
         try:
+            # Check whether the VM is running.
             service = await asyncio.to_thread(get_compute_service)
             instance = await asyncio.to_thread(get_instance, service)
 
             if instance.get("status") != "RUNNING":
-                await ctx.send("The Valheim server is currently offline.")
+                await ctx.send("The Valheim server is not running.")
                 return
 
-            host = get_external_ip(instance)
+            # Get external IP.
+            server_ip = get_external_ip(instance)
 
-            if not host:
-                await ctx.send(
-                    "Unable to check players: the server has no external IP."
-                )
+            if not server_ip:
+                await ctx.send("The server's external IP address is not available.")
                 return
 
-            # Query the server's player count.
+            address = (server_ip, A2S_PORT)
+
+            # Query player count.
             info = await asyncio.to_thread(
                 a2s.info,
-                (host, A2S_PORT),
+                address,
                 timeout=A2S_QUERY_TIMEOUT,
             )
 
-            if player_name is None:
-                await ctx.send(
-                    "**Valheim server status**\n"
-                    f"Players online: **{info.player_count}/"
-                    f"{info.max_players}**"
+            # Query individual player names separately.
+            try:
+                players = await asyncio.to_thread(
+                    a2s.players,
+                    address,
+                    timeout=A2S_QUERY_TIMEOUT,
                 )
-                return
+            except Exception:
+                logger.exception("Failed to retrieve Valheim player names")
+                players = None
 
-            # Query individual player names.
-            players = await asyncio.to_thread(
-                a2s.players,
-                (host, A2S_PORT),
-                timeout=A2S_QUERY_TIMEOUT,
-            )
+            count = info.player_count
+            maximum = info.max_players
 
-            matches = [
-                p.name
-                for p in players
-                if p.name and player_name.casefold() in p.name.casefold()
-            ]
+            message = [f"**Valheim players online: {count}/{maximum}**"]
 
-            if matches:
-                names = ", ".join(f"`{name}`" for name in matches)
-                await ctx.send(
-                    f"Found online player(s) matching **{player_name}**: {names}"
-                )
+            if players is None:
+                message.append("Player names could not be retrieved.")
             else:
-                await ctx.send(
-                    f"No online player matching **{player_name}** was found."
+                names = sorted(
+                    {p.name.strip() for p in players if p.name and p.name.strip()},
+                    key=str.casefold,
                 )
+
+                if names:
+                    message.extend(f"• {name}" for name in names)
+                elif count > 0:
+                    message.append(
+                        "The server reports players online, "
+                        "but their names weren't returned by the query."
+                    )
+                else:
+                    message.append("Nobody is online.")
+
+            await ctx.send("\n".join(message))
 
         except Exception:
             logger.exception("Failed to query Valheim player status")
-            await ctx.send(
-                "Unable to check player status. The server query failed, "
-                "so I cannot confirm whether that player is online."
-            )
+            await ctx.send("Unable to retrieve player status. Check the bot logs.")
