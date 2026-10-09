@@ -1,4 +1,5 @@
 from google.cloud import secretmanager
+
 from greenfieldbot.config import Config
 from greenfieldbot.gcp.compute import get_google_credentials
 

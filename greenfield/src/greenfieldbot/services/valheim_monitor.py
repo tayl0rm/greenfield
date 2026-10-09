@@ -1,293 +1,266 @@
 import asyncio
 import logging
 
-import discord
+import a2s
+
 from greenfieldbot.gcp.compute import (
     get_compute_service,
+    get_external_ip,
     get_instance,
     stop_instance,
 )
 
 logger = logging.getLogger(__name__)
 
+# Check for players every five hours.
+CHECK_INTERVAL = 5 * 60 * 60
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+# Wait up to 15 minutes before shutting down an empty server.
+RESPONSE_TIMEOUT = 15 * 60
 
-CHECK_INTERVAL = 5 * 60 * 60 # 5 hours
-RESPONSE_TIMEOUT = 15 * 60  # 15 minutes
+# Recheck player activity every minute during the grace period.
+PLAYER_POLL_INTERVAL = 60
 
+# Maximum time to wait for an A2S query.
+A2S_QUERY_TIMEOUT = 5.0
 
-# ---------------------------------------------------------------------------
-# Discord confirmation view
-# ---------------------------------------------------------------------------
-
-
-class ServerCheckView(discord.ui.View):
-    """Discord UI asking whether the Valheim server should remain online."""
-
-    def __init__(self, monitor: "ValheimMonitor"):
-        super().__init__(timeout=RESPONSE_TIMEOUT)
-
-        self.monitor = monitor
-        self.response = asyncio.Event()
-        self.action: str | None = None
-
-    async def _respond(
-        self,
-        interaction: discord.Interaction,
-        action: str,
-        message: str,
-    ):
-        """Handle a response from either button."""
-
-        # Prevent multiple interactions from being processed.
-        if self.action is not None:
-            return
-
-        self.action = action
-
-        await interaction.response.send_message(message)
-
-        self.response.set()
-        self.stop()
-
-    @discord.ui.button(
-        label="Yes",
-        style=discord.ButtonStyle.green,
-        custom_id="valheim_still_playing_yes",
-    )
-    async def yes_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        await self._respond(
-            interaction,
-            "yes",
-            "Excellent. The Valheim server will remain online for another 5 hours.",
-        )
-
-    @discord.ui.button(
-        label="No",
-        style=discord.ButtonStyle.red,
-        custom_id="valheim_still_playing_no",
-    )
-    async def no_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        await self._respond(
-            interaction,
-            "no",
-            "Understood. The Valheim server will now shut down.",
-        )
-
-    async def on_timeout(self):
-        """Handle the user not responding within the timeout period."""
-
-        if self.action is not None:
-            return
-
-        self.action = "timeout"
-        self.response.set()
-
-
-# ---------------------------------------------------------------------------
-# Valheim monitor
-# ---------------------------------------------------------------------------
+# Valheim Steam server query port.
+A2S_PORT = 2457
 
 
 class ValheimMonitor:
-    """Monitors the Valheim server and periodically asks whether it is still
-    being used.
-    """
-
-    def __init__(self, bot, channel_id: int):
+    def __init__(self, bot, channel_id: int | None = None):
         self.bot = bot
         self.channel_id = channel_id
-        self.task: asyncio.Task | None = None
-
-    # -----------------------------------------------------------------------
-    # Lifecycle
-    # -----------------------------------------------------------------------
+        self._monitor_task: asyncio.Task | None = None
 
     def start(self):
-        """Start the monitor if it is not already running."""
-
-        if self.task and not self.task.done():
+        """Start the background monitoring task if it isn't already running."""
+        if self._monitor_task and not self._monitor_task.done():
             logger.info("Valheim monitor is already running.")
             return
 
-        self.task = asyncio.create_task(self._monitor())
-
+        self._monitor_task = asyncio.create_task(
+            self._monitor(),
+            name="valheim-monitor",
+        )
         logger.info("Valheim monitor started.")
 
     async def stop(self):
-        """Stop the monitor task."""
+        """Cancel the background monitoring task."""
+        if self._monitor_task and not self._monitor_task.done():
+            self._monitor_task.cancel()
 
-        if not self.task or self.task.done():
-            self.task = None
-            return
+            try:
+                await self._monitor_task
+            except asyncio.CancelledError:
+                pass
 
-        current_task = asyncio.current_task()
+            logger.info("Valheim monitor stopped.")
 
-        # Don't attempt to cancel ourselves.
-        if self.task is current_task:
-            return
-
-        self.task.cancel()
-
-        try:
-            await self.task
-        except asyncio.CancelledError:
-            pass
-
-        self.task = None
-
-        logger.info("Valheim monitor stopped.")
-
-    # -----------------------------------------------------------------------
-    # Monitoring
-    # -----------------------------------------------------------------------
+        self._monitor_task = None
 
     async def _monitor(self):
-        """Main monitoring loop."""
-
-        try:
-            while True:
+        """Periodically check server activity and stop an idle VM safely."""
+        while True:
+            try:
                 logger.info(
-                    "Valheim activity monitor sleeping for %s hours.",
+                    "Next Valheim activity check in %.1f hours.",
                     CHECK_INTERVAL / 3600,
                 )
-
                 await asyncio.sleep(CHECK_INTERVAL)
 
-                if not self._is_server_running():
+                # Run Google Cloud API calls outside the event loop.
+                service = await asyncio.to_thread(get_compute_service)
+                instance = await asyncio.to_thread(get_instance, service)
+
+                status = instance.get("status")
+
+                if status != "RUNNING":
                     logger.info(
-                        "Valheim server is no longer running. Stopping monitor."
-                    )
-                    return
-
-                channel = self._get_channel()
-
-                if channel is None:
-                    return
-
-                action = await self._ask_if_server_is_still_active(channel)
-
-                if action == "yes":
-                    logger.info(
-                        "Valheim server confirmed active. "
-                        "Starting another 5-hour period."
+                        "Valheim VM is %s; will check again in five hours.",
+                        status or "in an unknown state",
                     )
                     continue
 
-                if action == "timeout":
-                    await channel.send(
-                        "⏰ Nobody responded within 15 minutes. "
-                        "The Valheim server will now shut down."
+                host = get_external_ip(instance)
+
+                if not host:
+                    logger.warning(
+                        "Valheim VM has no external IP; skipping this activity check."
                     )
+                    continue
 
-                await self.shutdown()
-                return
+                player_count = await self._get_player_count(host)
 
-        except asyncio.CancelledError:
-            logger.info("Valheim monitor cancelled.")
-            raise
+                # A failed query is not evidence that the server is empty.
+                if player_count is None:
+                    logger.warning(
+                        "Could not determine Valheim player count; "
+                        "keeping the VM running."
+                    )
+                    continue
 
-        except Exception:
-            logger.exception("Valheim monitor failed.")
+                if player_count > 0:
+                    logger.info(
+                        "Valheim has %d player(s) online; keeping the VM running.",
+                        player_count,
+                    )
+                    continue
 
-    # -----------------------------------------------------------------------
-    # GCE state
-    # -----------------------------------------------------------------------
+                logger.info(
+                    "A2S reports zero players. "
+                    "Starting the 15-minute shutdown grace period."
+                )
 
-    def _is_server_running(self) -> bool:
-        """Return True if the Valheim GCE instance is running."""
+                result = await self._wait_for_activity(host)
 
-        service = get_compute_service()
-        instance = get_instance(service)
+                if result == "active":
+                    logger.info("Player activity detected; cancelling shutdown.")
+                    continue
 
-        status = instance.get("status")
+                if result == "unknown":
+                    logger.warning(
+                        "Player count became unknown during the grace "
+                        "period; cancelling shutdown."
+                    )
+                    continue
 
-        logger.info(
-            "Valheim GCE instance status: %s",
-            status,
-        )
+                # The grace period elapsed with repeated successful,
+                # zero-player responses. Verify again immediately before
+                # requesting VM shutdown.
+                final_count = await self._get_player_count(host)
 
-        return status == "RUNNING"
+                if final_count is None:
+                    logger.warning("Final A2S query failed; cancelling shutdown.")
+                    continue
 
-    # -----------------------------------------------------------------------
-    # Discord
-    # -----------------------------------------------------------------------
+                if final_count > 0:
+                    logger.info(
+                        "Final A2S check found %d player(s); cancelling shutdown.",
+                        final_count,
+                    )
+                    continue
 
-    def _get_channel(self):
-        """Return the configured Discord channel."""
+                await self._shutdown_vm()
 
-        channel = self.bot.get_channel(self.channel_id)
+            except asyncio.CancelledError:
+                logger.info("Valheim monitor task cancelled.")
+                raise
 
-        if channel is None:
-            logger.error(
-                "Could not find Discord channel %s.",
-                self.channel_id,
+            except Exception:
+                # Keep the monitor alive if one monitoring cycle fails.
+                logger.exception(
+                    "Unexpected error during Valheim monitoring cycle. "
+                    "Will retry in five hours."
+                )
+
+    async def _get_player_count(self, host: str) -> int | None:
+        """
+        Return the current A2S player count.
+
+        Returns None if the query fails or the response is invalid.
+        Never interpret an unknown count as zero.
+        """
+        try:
+            info = await asyncio.to_thread(
+                a2s.info,
+                (host, A2S_PORT),
+                timeout=A2S_QUERY_TIMEOUT,
             )
 
-        return channel
+            player_count = getattr(info, "player_count", None)
 
-    async def _ask_if_server_is_still_active(
-        self,
-        channel,
-    ) -> str:
-        """Ask Discord whether anybody is still playing.
+            if (
+                not isinstance(player_count, int)
+                or isinstance(player_count, bool)
+                or player_count < 0
+            ):
+                logger.warning(
+                    "A2S returned an invalid player count: %r",
+                    player_count,
+                )
+                return None
+
+            logger.debug(
+                "A2S query for %s:%d reports %d player(s).",
+                host,
+                A2S_PORT,
+                player_count,
+            )
+            return player_count
+
+        except Exception as exc:
+            logger.warning(
+                "A2S query failed for %s:%d: %s",
+                host,
+                A2S_PORT,
+                exc,
+            )
+            return None
+
+    async def _wait_for_activity(self, host: str) -> str:
+        """
+        Monitor player activity during the shutdown grace period.
 
         Returns:
-            "yes"
-            "no"
-            "timeout"
+            "active"  - players were detected.
+            "empty"   - the entire grace period passed with zero players.
+            "unknown" - a query failed, so shutdown cannot be confirmed.
         """
+        deadline = asyncio.get_running_loop().time() + RESPONSE_TIMEOUT
 
-        view = ServerCheckView(self)
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
 
-        await channel.send(
-            "🎮 **Is anyone still playing on the Valheim server?**\n\n"
-            "The server has been running for 5 hours. "
-            "Please select **Yes** if someone is still playing.\n\n"
-            "If nobody responds within 15 minutes, "
-            "the server will automatically shut down.",
-            view=view,
-        )
+            if remaining <= 0:
+                logger.info("The 15-minute grace period elapsed with no players.")
+                return "empty"
 
-        await view.response.wait()
+            await asyncio.sleep(min(PLAYER_POLL_INTERVAL, remaining))
 
-        logger.info(
-            "Valheim activity response received: %s",
-            view.action,
-        )
+            player_count = await self._get_player_count(host)
 
-        return view.action
+            if player_count is None:
+                return "unknown"
 
-    # -----------------------------------------------------------------------
-    # Shutdown
-    # -----------------------------------------------------------------------
+            if player_count > 0:
+                logger.info(
+                    "Detected %d player(s) during the grace period.",
+                    player_count,
+                )
+                return "active"
 
-    async def shutdown(self):
-        """Stop the Valheim server and terminate monitoring."""
-
-        service = get_compute_service()
-        instance = get_instance(service)
-
-        status = instance.get("status")
-
-        if status != "RUNNING":
             logger.info(
-                "Valheim server is already in state %s.",
-                status,
+                "Grace-period check: zero players. %.0f seconds remaining.",
+                max(
+                    0,
+                    deadline - asyncio.get_running_loop().time(),
+                ),
             )
-            return
 
-        stop_instance(service)
+    async def _shutdown_vm(self):
+        """Stop the VM only if Google Cloud confirms it is still running."""
+        try:
+            service = await asyncio.to_thread(get_compute_service)
+            instance = await asyncio.to_thread(get_instance, service)
 
-        logger.info("Valheim server shutdown initiated.")
+            status = instance.get("status")
+
+            if status != "RUNNING":
+                logger.info(
+                    "Valheim VM is %s; no shutdown request needed.",
+                    status or "in an unknown state",
+                )
+                return
+
+            logger.info("Requesting shutdown of the Valheim VM.")
+
+            await asyncio.to_thread(stop_instance, service)
+
+            logger.info("Valheim VM shutdown request submitted.")
+
+        except Exception:
+            logger.exception(
+                "Failed to stop the Valheim VM. The monitor will continue running."
+            )

@@ -11,9 +11,20 @@ dependencies = [
     "google-api-python-client",
     "google-cloud-compute",
     "google-cloud-secret-manager",
+    "python-a2s>=1.4.2,<2",
 ]
 
 [dependency-groups]
 dev = [
     "black",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"

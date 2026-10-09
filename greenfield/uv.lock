@@ -390,6 +390,7 @@ dependencies = [
     { name = "google-api-python-client" },
     { name = "google-cloud-compute" },
     { name = "google-cloud-secret-manager" },
+    { name = "python-a2s" },
     { name = "python-dotenv" },
 ]
 
@@ -405,6 +406,7 @@ requires-dist = [
     { name = "google-api-python-client" },
     { name = "google-cloud-compute" },
     { name = "google-cloud-secret-manager" },
+    { name = "python-a2s", specifier = ">=1.4.2,<2" },
     { name = "python-dotenv" },
 ]
 
@@ -634,6 +636,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
+]
+
+[[package]]
+name = "python-a2s"
+version = "1.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/44/7ee4a944dcc82952dc3c3649690ab35efa1d0ba62b2c5e75bc104606f728/python_a2s-1.4.2.tar.gz", hash = "sha256:aacd7fb2d33b330eb6f84e2c99794e0a7c4bdd0c92c1b4507b0373a6f92c162b", size = 12490, upload-time = "2026-06-15T23:34:24.725Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/59/d7c5e09ffbb3b74d88f89306170091a0943b88a6f952f38bcfeca74fc60a/python_a2s-1.4.2-py3-none-any.whl", hash = "sha256:c0ff89b978147db62ed102789bf6cf4693c18b328e96edc6575e6b17edf826be", size = 13433, upload-time = "2026-06-15T23:34:23.289Z" },
 ]
 
 [[package]]
