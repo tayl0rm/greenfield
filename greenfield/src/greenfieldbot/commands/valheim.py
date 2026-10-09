@@ -1,4 +1,7 @@
 import asyncio
+import logging
+
+import a2s
 
 from greenfieldbot.gcp.compute import (
     get_compute_service,
@@ -10,6 +13,11 @@ from greenfieldbot.gcp.compute import (
 from greenfieldbot.gcp.secrets import get_valheim_password
 from greenfieldbot.services.valheim_monitor import ValheimMonitor
 
+logger = logging.getLogger(__name__)
+
+A2S_PORT = 2457
+A2S_QUERY_TIMEOUT = 5.0
+
 
 def setup(bot):
 
@@ -20,14 +28,11 @@ def setup(bot):
         )
 
         try:
-            service = get_compute_service()
+            service = await asyncio.to_thread(get_compute_service)
 
-            # ----------------------------------------------------
             # Check instance
-            # ----------------------------------------------------
-
             try:
-                instance = get_instance(service)
+                instance = await asyncio.to_thread(get_instance, service)
 
             except Exception as exc:
                 error_text = str(exc)
@@ -54,25 +59,19 @@ def setup(bot):
                 )
                 return
 
-            # ----------------------------------------------------
             # Start instance
-            # ----------------------------------------------------
-
-            start_instance(service)
+            await asyncio.to_thread(start_instance, service)
 
             await ctx.channel.send(
                 "The Valheim server is starting. "
                 "I'll check it periodically and let you know when it's ready."
             )
 
-            # ----------------------------------------------------
             # Poll for instance to reach RUNNING
-            # ----------------------------------------------------
-
             for _ in range(12):
                 await asyncio.sleep(10)
 
-                instance = get_instance(service)
+                instance = await asyncio.to_thread(get_instance, service)
                 status = instance.get("status")
 
                 if status == "RUNNING":
@@ -80,7 +79,7 @@ def setup(bot):
 
                 if status not in ("PROVISIONING", "STAGING", "RUNNING"):
                     await ctx.channel.send(
-                        f"The Valheim server failed to start. "
+                        "The Valheim server failed to start. "
                         f"Current instance state: `{status}`."
                     )
                     return
@@ -92,10 +91,7 @@ def setup(bot):
                 )
                 return
 
-            # ----------------------------------------------------
             # Get external IP
-            # ----------------------------------------------------
-
             valheim_server_ip = get_external_ip(instance)
 
             if not valheim_server_ip:
@@ -105,10 +101,7 @@ def setup(bot):
                 )
                 return
 
-            # ----------------------------------------------------
             # Wait for Valheim
-            # ----------------------------------------------------
-
             await ctx.channel.send(
                 "The VM is running. Waiting for the Valheim server "
                 "to finish starting..."
@@ -116,26 +109,17 @@ def setup(bot):
 
             await asyncio.sleep(60)
 
-            # ----------------------------------------------------
             # Get server password
-            # ----------------------------------------------------
-
-            password = get_valheim_password()
+            password = await asyncio.to_thread(get_valheim_password)
 
             await ctx.channel.send(
-                f"I'd like to inform you that the Valheim Server, "
-                f"**SuperDuperVikingFunTime**, is now accessible at "
+                "I'd like to inform you that the Valheim Server, "
+                "**SuperDuperVikingFunTime**, is now accessible at "
                 f"**{valheim_server_ip}**!\n\n"
                 f"Server password: **{password}**"
             )
 
-            # ----------------------------------------------------
             # Start activity monitor
-            # ----------------------------------------------------
-
-            # Stop any existing monitor first. This prevents
-            # multiple 5-hour timers from being created if
-            # !valheim-up is invoked more than once.
             existing_monitor = getattr(bot, "valheim_monitor", None)
 
             if existing_monitor:
@@ -145,10 +129,10 @@ def setup(bot):
                 bot=bot,
                 channel_id=ctx.channel.id,
             )
-
             bot.valheim_monitor.start()
 
         except Exception:
+            logger.exception("Failed to start Valheim server")
             await ctx.channel.send(
                 "Something went wrong while starting the Valheim server. "
                 "Check the bot logs for more information."
@@ -157,32 +141,22 @@ def setup(bot):
 
     @bot.command(name="valheim-down")
     async def valheim_down(ctx):
-
         await ctx.channel.send("The Valheim server is currently shutting down!")
 
         try:
-            # ----------------------------------------------------
             # Stop activity monitor
-            # ----------------------------------------------------
-
             monitor = getattr(bot, "valheim_monitor", None)
 
             if monitor:
                 await monitor.stop()
                 bot.valheim_monitor = None
 
-            # ----------------------------------------------------
             # Get compute service
-            # ----------------------------------------------------
+            service = await asyncio.to_thread(get_compute_service)
 
-            service = get_compute_service()
-
-            # ----------------------------------------------------
             # Check instance
-            # ----------------------------------------------------
-
             try:
-                instance = get_instance(service)
+                instance = await asyncio.to_thread(get_instance, service)
 
             except Exception as exc:
                 error_text = str(exc)
@@ -195,7 +169,7 @@ def setup(bot):
 
             status = instance.get("status")
 
-            if status == "TERMINATED":
+            if status in ("TERMINATED", "STOPPED"):
                 await ctx.channel.send("The Valheim server is already shut down.")
                 return
 
@@ -206,30 +180,24 @@ def setup(bot):
                 )
                 return
 
-            # ----------------------------------------------------
             # Stop instance
-            # ----------------------------------------------------
-
-            stop_instance(service)
+            await asyncio.to_thread(stop_instance, service)
 
             await ctx.channel.send(
                 "The Valheim server has been instructed to shut down."
             )
 
-            # ----------------------------------------------------
             # Poll for termination
-            # ----------------------------------------------------
-
             max_attempts = 12
             poll_interval = 5
 
             for _ in range(max_attempts):
                 await asyncio.sleep(poll_interval)
 
-                instance = get_instance(service)
+                instance = await asyncio.to_thread(get_instance, service)
                 status = instance.get("status")
 
-                if status == "TERMINATED":
+                if status in ("TERMINATED", "STOPPED"):
                     await ctx.channel.send(
                         "The Valheim server has shut down, "
                         "as it descends into a slumber. Fear not, "
@@ -244,9 +212,73 @@ def setup(bot):
             )
 
         except Exception:
+            logger.exception("Failed to stop Valheim server")
             await ctx.channel.send(
                 "Something went wrong while shutting down the "
                 "Valheim server. Check the bot logs for more information."
             )
-
             raise
+
+    @bot.command(name="player")
+    async def player(ctx, *, player_name: str = None):
+        """Check Valheim's online player count or search by player name."""
+        try:
+            service = await asyncio.to_thread(get_compute_service)
+            instance = await asyncio.to_thread(get_instance, service)
+
+            if instance.get("status") != "RUNNING":
+                await ctx.send("The Valheim server is currently offline.")
+                return
+
+            host = get_external_ip(instance)
+
+            if not host:
+                await ctx.send(
+                    "Unable to check players: the server has no external IP."
+                )
+                return
+
+            # Query the server's player count.
+            info = await asyncio.to_thread(
+                a2s.info,
+                (host, A2S_PORT),
+                timeout=A2S_QUERY_TIMEOUT,
+            )
+
+            if player_name is None:
+                await ctx.send(
+                    "**Valheim server status**\n"
+                    f"Players online: **{info.player_count}/"
+                    f"{info.max_players}**"
+                )
+                return
+
+            # Query individual player names.
+            players = await asyncio.to_thread(
+                a2s.players,
+                (host, A2S_PORT),
+                timeout=A2S_QUERY_TIMEOUT,
+            )
+
+            matches = [
+                p.name
+                for p in players
+                if p.name and player_name.casefold() in p.name.casefold()
+            ]
+
+            if matches:
+                names = ", ".join(f"`{name}`" for name in matches)
+                await ctx.send(
+                    f"Found online player(s) matching **{player_name}**: {names}"
+                )
+            else:
+                await ctx.send(
+                    f"No online player matching **{player_name}** was found."
+                )
+
+        except Exception:
+            logger.exception("Failed to query Valheim player status")
+            await ctx.send(
+                "Unable to check player status. The server query failed, "
+                "so I cannot confirm whether that player is online."
+            )
