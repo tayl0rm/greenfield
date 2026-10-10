@@ -1,14 +1,13 @@
 import asyncio
 import logging
 
-import a2s
-
 from greenfieldbot.gcp.compute import (
     get_compute_service,
     get_external_ip,
     get_instance,
     stop_instance,
 )
+from greenfieldbot.services.valheim import get_player_info
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +20,6 @@ RESPONSE_TIMEOUT = 15 * 60
 # Recheck player activity every minute during the grace period.
 PLAYER_POLL_INTERVAL = 60
 
-# Maximum time to wait for an A2S query.
-A2S_QUERY_TIMEOUT = 5.0
-
-# Valheim Steam server query port.
-A2S_PORT = 2457
-
 
 class ValheimMonitor:
     def __init__(self, bot, channel_id: int | None = None):
@@ -35,7 +28,7 @@ class ValheimMonitor:
         self._monitor_task: asyncio.Task | None = None
 
     def start(self):
-        """Start the background monitoring task if it isn't already running."""
+        """Start the monitoring task if it is not already running."""
         if self._monitor_task and not self._monitor_task.done():
             logger.info("Valheim monitor is already running.")
             return
@@ -48,11 +41,13 @@ class ValheimMonitor:
 
     async def stop(self):
         """Cancel the background monitoring task."""
-        if self._monitor_task and not self._monitor_task.done():
-            self._monitor_task.cancel()
+        task = self._monitor_task
+
+        if task and not task.done():
+            task.cancel()
 
             try:
-                await self._monitor_task
+                await task
             except asyncio.CancelledError:
                 pass
 
@@ -61,7 +56,7 @@ class ValheimMonitor:
         self._monitor_task = None
 
     async def _monitor(self):
-        """Check activity regularly and stop the VM after 15 idle minutes."""
+        """Monitor player activity and stop the VM after 15 idle minutes."""
         while True:
             try:
                 service = await asyncio.to_thread(get_compute_service)
@@ -82,7 +77,7 @@ class ValheimMonitor:
 
                 if not host:
                     logger.warning(
-                        "Valheim VM has no external IP; will retry in %d seconds.",
+                        "Valheim VM has no external IP; retrying in %d seconds.",
                         CHECK_INTERVAL,
                     )
                     await asyncio.sleep(CHECK_INTERVAL)
@@ -92,8 +87,8 @@ class ValheimMonitor:
 
                 if player_count is None:
                     logger.warning(
-                        "Could not determine Valheim player count; "
-                        "keeping the VM running and retrying in %d seconds.",
+                        "Could not determine Valheim player count. "
+                        "Keeping the VM running and retrying in %d seconds.",
                         CHECK_INTERVAL,
                     )
                     await asyncio.sleep(CHECK_INTERVAL)
@@ -120,13 +115,13 @@ class ValheimMonitor:
 
                 if result == "unknown":
                     logger.warning(
-                        "Player count became unknown during the grace period; "
-                        "cancelling shutdown."
+                        "Player count became unknown during the grace "
+                        "period; cancelling shutdown."
                     )
                     await asyncio.sleep(CHECK_INTERVAL)
                     continue
 
-                # Verify again immediately before requesting shutdown.
+                # Check again immediately before requesting shutdown.
                 final_count = await self._get_player_count(host)
 
                 if final_count is None:
@@ -143,7 +138,7 @@ class ValheimMonitor:
 
                 await self._shutdown_vm()
 
-                # Avoid repeatedly querying the VM immediately after shutdown.
+                # Avoid immediately repeating the cycle after shutdown.
                 await asyncio.sleep(CHECK_INTERVAL)
 
             except asyncio.CancelledError:
@@ -160,51 +155,20 @@ class ValheimMonitor:
 
     async def _get_player_count(self, host: str) -> int | None:
         """
-        Return the current A2S player count.
+        Return the player count, or None if the query fails.
 
-        Returns None if the query fails or the response is invalid.
-        Never interpret an unknown count as zero.
+        An unknown count must never be interpreted as zero.
         """
-        try:
-            info = await asyncio.to_thread(
-                a2s.info,
-                (host, A2S_PORT),
-                timeout=A2S_QUERY_TIMEOUT,
-            )
+        info = await get_player_info(host)
 
-            player_count = getattr(info, "player_count", None)
-
-            if (
-                not isinstance(player_count, int)
-                or isinstance(player_count, bool)
-                or player_count < 0
-            ):
-                logger.warning(
-                    "A2S returned an invalid player count: %r",
-                    player_count,
-                )
-                return None
-
-            logger.debug(
-                "A2S query for %s:%d reports %d player(s).",
-                host,
-                A2S_PORT,
-                player_count,
-            )
-            return player_count
-
-        except Exception as exc:
-            logger.warning(
-                "A2S query failed for %s:%d: %s",
-                host,
-                A2S_PORT,
-                exc,
-            )
+        if info is None:
             return None
+
+        return info.player_count
 
     async def _wait_for_activity(self, host: str) -> str:
         """
-        Monitor player activity during the shutdown grace period.
+        Monitor player activity throughout the shutdown grace period.
 
         Returns:
             "active"  - players were detected.
@@ -241,7 +205,7 @@ class ValheimMonitor:
             )
 
     async def _shutdown_vm(self):
-        """Stop the VM only if Google Cloud confirms it is still running."""
+        """Request VM shutdown only if Google Cloud confirms it is running."""
         try:
             service = await asyncio.to_thread(get_compute_service)
             instance = await asyncio.to_thread(get_instance, service)
