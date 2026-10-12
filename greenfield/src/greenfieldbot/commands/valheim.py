@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def setup(bot):
     def ensure_monitor(channel_id: int):
-        """Ensure exactly one Valheim monitor task is running."""
+        """Ensure one usage monitor is running."""
         monitor = getattr(bot, "valheim_monitor", None)
 
         if monitor is None:
@@ -38,7 +38,6 @@ def setup(bot):
         try:
             service = await asyncio.to_thread(get_compute_service)
 
-            # Check the instance.
             try:
                 instance = await asyncio.to_thread(get_instance, service)
             except Exception as exc:
@@ -55,12 +54,13 @@ def setup(bot):
 
             status = instance.get("status")
 
-            # The VM may already be running without a monitor.
             if status == "RUNNING":
                 ensure_monitor(ctx.channel.id)
+
                 await ctx.channel.send(
                     "The Valheim server is already running. "
-                    "Activity monitoring is enabled."
+                    "Usage monitoring is enabled. I'll ask whether "
+                    "it's still needed in 2 hours."
                 )
                 return
 
@@ -71,7 +71,6 @@ def setup(bot):
                 )
                 return
 
-            # Start the instance.
             await asyncio.to_thread(start_instance, service)
 
             await ctx.channel.send(
@@ -79,7 +78,7 @@ def setup(bot):
                 "I'll check it periodically and let you know when it's ready."
             )
 
-            # Poll until the VM reaches RUNNING.
+            # Wait for the VM to reach RUNNING.
             for _ in range(12):
                 await asyncio.sleep(10)
 
@@ -102,18 +101,16 @@ def setup(bot):
                 )
                 return
 
-            # Start monitoring as soon as the VM is running.
-            # The monitor safely retries if Valheim is not ready yet.
+            # Start the two-hour timer as soon as the VM is running.
             ensure_monitor(ctx.channel.id)
 
-            # Get the external IP.
-            valheim_server_ip = get_external_ip(instance)
+            server_ip = get_external_ip(instance)
 
-            if not valheim_server_ip:
+            if not server_ip:
                 await ctx.channel.send(
                     "The Valheim server is running, but its external "
-                    "IP address is not available yet. "
-                    "Activity monitoring is enabled."
+                    "IP address is not available yet. Usage monitoring "
+                    "is enabled."
                 )
                 return
 
@@ -122,16 +119,14 @@ def setup(bot):
                 "to finish starting..."
             )
 
-            # Allow time for the Valheim server to initialise.
             await asyncio.sleep(60)
 
-            # Get the server password.
             password = await asyncio.to_thread(get_valheim_password)
 
             await ctx.channel.send(
                 "I'd like to inform you that the Valheim Server, "
                 "**SuperDuperVikingFunTime**, is now accessible at "
-                f"**{valheim_server_ip}**!\n\n"
+                f"**{server_ip}**!\n\n"
                 f"Server password: **{password}**"
             )
 
@@ -147,7 +142,7 @@ def setup(bot):
         await ctx.channel.send("The Valheim server is currently shutting down!")
 
         try:
-            # Stop activity monitoring before manually stopping the VM.
+            # Cancel the usage timer before manually stopping the VM.
             monitor = getattr(bot, "valheim_monitor", None)
 
             if monitor:
@@ -156,7 +151,6 @@ def setup(bot):
 
             service = await asyncio.to_thread(get_compute_service)
 
-            # Check the instance.
             try:
                 instance = await asyncio.to_thread(get_instance, service)
             except Exception as exc:
@@ -181,19 +175,14 @@ def setup(bot):
                 )
                 return
 
-            # Request shutdown.
             await asyncio.to_thread(stop_instance, service)
 
             await ctx.channel.send(
                 "The Valheim server has been instructed to shut down."
             )
 
-            # Poll for termination.
-            max_attempts = 12
-            poll_interval = 5
-
-            for _ in range(max_attempts):
-                await asyncio.sleep(poll_interval)
+            for _ in range(12):
+                await asyncio.sleep(5)
 
                 instance = await asyncio.to_thread(get_instance, service)
                 status = instance.get("status")
@@ -221,7 +210,7 @@ def setup(bot):
 
     @bot.command(name="player")
     async def player(ctx):
-        """Show the current Valheim player count."""
+        """Manually query the current Valheim player count."""
         try:
             service = await asyncio.to_thread(get_compute_service)
             instance = await asyncio.to_thread(get_instance, service)
@@ -241,8 +230,8 @@ def setup(bot):
             if info is None:
                 await ctx.send(
                     "Unable to retrieve the player count. "
-                    "The server may still be starting up or its query "
-                    "port may be unreachable."
+                    "The server may be starting up or its query port "
+                    "may be unreachable."
                 )
                 return
 
